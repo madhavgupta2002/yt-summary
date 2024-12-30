@@ -7,226 +7,357 @@ console.log('YouTube Transcript Copier content script loaded');
 // Create and inject styles for the floating panel
 const style = document.createElement('style');
 style.textContent = `
+  @keyframes gradientBorder {
+    0% { border-image: linear-gradient(45deg, #3ea6ff, #34A853, #3ea6ff) 1; }
+    50% { border-image: linear-gradient(45deg, #34A853, #3ea6ff, #34A853) 1; }
+    100% { border-image: linear-gradient(45deg, #3ea6ff, #34A853, #3ea6ff) 1; }
+  }
+
   .yt-transcript-panel {
     position: fixed;
     bottom: 20px;
     right: 20px;
     width: 800px;
-    background-color: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    background-color: #0f0f0f;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     z-index: 9999;
-    font-family: Arial, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     overflow: hidden;
+    border: 2px solid transparent;
+    color: #fff;
+    animation: gradientBorder 3s linear infinite;
   }
 
   .yt-transcript-header {
     padding: 16px;
-    background-color: #4285f4;
-    color: white;
-    font-weight: bold;
-    font-size: 18px;
+    background-color: #0f0f0f;
+    color: #fff;
+    font-weight: 600;
+    font-size: 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
   }
 
   .video-info {
     padding: 16px;
-    border-bottom: 1px solid #eee;
-    background-color: #f8f9fa;
+    background-color: #161616;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
   }
 
   .video-title {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 500;
     margin-bottom: 8px;
+    color: #fff;
   }
 
   .video-meta {
-    font-size: 13px;
-    color: #606060;
+    font-size: 12px;
+    color: #aaa;
     display: flex;
     gap: 12px;
   }
 
   .channel-name {
-    color: #065fd4;
+    color: #3ea6ff;
     text-decoration: none;
+    font-weight: 500;
+  }
+
+  .channel-name:hover {
+    text-decoration: underline;
   }
 
   .yt-transcript-content {
     display: flex;
-    gap: 20px;
-    padding: 20px;
-    height: 400px;
+    gap: 16px;
+    padding: 16px;
+    height: 500px;
+    transition: all 0.3s ease;
   }
 
   .transcript-column, .summary-column {
     flex: 1;
     display: flex;
     flex-direction: column;
+    background-color: #161616;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+
+  .transcript-column.collapsed {
+    flex: 0;
+    width: 0;
+    padding: 0;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .summary-column.expanded {
+    flex: 2;
   }
 
   .column-header {
-    font-size: 16px;
-    font-weight: 500;
-    color: #3c4043;
-    margin-bottom: 12px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .column-content {
     flex: 1;
-    background-color: #f8f9fa;
-    border-radius: 8px;
     padding: 16px;
     overflow-y: auto;
-    font-size: 14px;
-    line-height: 1.6;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #fff;
   }
 
-  .summary-content h1, .summary-content h2, .summary-content h3 {
-    margin-top: 16px;
-    margin-bottom: 8px;
-    font-weight: 500;
+  .column-content::-webkit-scrollbar {
+    width: 6px;
   }
 
-  .summary-content ul, .summary-content ol {
-    margin: 8px 0;
-    padding-left: 24px;
+  .column-content::-webkit-scrollbar-track {
+    background: transparent;
   }
 
-  .summary-content li {
-    margin: 4px 0;
+  .column-content::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.2);
+    border-radius: 3px;
   }
 
-  .summary-content p {
-    margin: 8px 0;
-  }
-
-  .timestamp {
-    color: #666;
-    font-weight: 500;
-    margin-right: 8px;
-  }
-
-  .yt-transcript-buttons {
-    display: flex;
-    gap: 12px;
-    padding: 16px;
-    border-top: 1px solid #eee;
-  }
-
-  .yt-transcript-button {
-    flex: 1;
-    padding: 12px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s;
-  }
-
-  .yt-transcript-button.primary {
-    background-color: #4285f4;
-    color: white;
-  }
-
-  .yt-transcript-button.secondary {
-    background-color: #f1f3f4;
-    color: #3c4043;
-  }
-
-  .yt-transcript-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  }
-
-  .minimize-button {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-    padding: 4px;
-    font-size: 20px;
-    line-height: 1;
-  }
-
-  .summary-sections {
+  .markdown-editor {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    height: 100%;
+    background-color: #161616;
   }
 
-  .summary-section {
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    padding: 16px;
-  }
-
-  .section-header {
+  .markdown-toolbar {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
+    gap: 4px;
+    padding: 8px;
+    background-color: #202020;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    flex-wrap: wrap;
   }
 
-  .section-title {
-    font-size: 14px;
-    font-weight: 500;
-    color: #3c4043;
-  }
-
-  .edit-button {
-    background: none;
-    border: none;
-    color: #065fd4;
-    cursor: pointer;
-    font-size: 13px;
+  .toolbar-button {
     padding: 4px 8px;
+    background-color: transparent;
+    border: none;
     border-radius: 4px;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
-  .edit-button:hover {
-    background-color: rgba(6, 95, 212, 0.1);
+  .toolbar-button:hover {
+    background-color: rgba(255,255,255,0.1);
+    color: #fff;
+  }
+
+  .toolbar-button i {
+    font-size: 14px;
   }
 
   .edit-area {
+    flex: 1;
     width: 100%;
-    min-height: 150px;
-    font-family: inherit;
-    font-size: 14px;
-    line-height: 1.6;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    resize: vertical;
+    padding: 16px;
+    border: none;
+    resize: none;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #fff;
+    background-color: #161616;
+  }
+
+  .edit-area:focus {
+    outline: none;
   }
 
   .edit-actions {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
-    margin-top: 8px;
+    padding: 12px;
+    background-color: #202020;
+    border-top: 1px solid rgba(255,255,255,0.1);
   }
 
-  .edit-actions button {
+  .edit-button {
     padding: 6px 12px;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .edit-button:hover {
+    transform: translateY(-1px);
   }
 
   .save-button {
-    background-color: #065fd4;
-    color: white;
+    background-color: #3ea6ff;
+    color: #0f0f0f;
+  }
+
+  .save-button:hover {
+    background-color: #65b8ff;
   }
 
   .cancel-button {
-    background-color: #f1f3f4;
-    color: #3c4043;
+    background-color: #272727;
+    color: #fff;
+  }
+
+  .cancel-button:hover {
+    background-color: #333;
+  }
+
+  .minimize-button, .collapse-button {
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 18px;
+    line-height: 1;
+    border-radius: 4px;
+  }
+
+  .minimize-button:hover, .collapse-button:hover {
+    background-color: rgba(255,255,255,0.1);
+    color: #fff;
+  }
+
+  .yt-transcript-buttons {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    background-color: #0f0f0f;
+  }
+
+  .yt-transcript-button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .yt-transcript-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .yt-transcript-button.primary {
+    background-color: #3ea6ff;
+    color: #0f0f0f;
+  }
+
+  .yt-transcript-button.primary:hover {
+    background-color: #65b8ff;
+  }
+
+  .yt-transcript-button.secondary {
+    background-color: #272727;
+    color: #fff;
+  }
+
+  .yt-transcript-button.secondary:hover {
+    background-color: #333;
+  }
+
+  .timestamp {
+    color: #aaa;
+    font-weight: 500;
+    margin-right: 8px;
+    user-select: none;
+    font-size: 12px;
+  }
+
+  h1, h2, h3 {
+    color: #fff;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  p {
+    margin: 8px 0;
+  }
+
+  br + br {
+    display: none;
+  }
+
+  ul, ol {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+
+  li {
+    margin: 4px 0;
+  }
+
+  blockquote {
+    border-left: 3px solid #3ea6ff;
+    margin: 8px 0;
+    padding-left: 12px;
+    color: #aaa;
+  }
+
+  .restore-transcript-button {
+    position: absolute;
+    left: -32px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #161616;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: #aaa;
+    cursor: pointer;
+    padding: 8px;
+    font-size: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+  }
+
+  .restore-transcript-button:hover {
+    background-color: #202020;
+    color: #fff;
+  }
+
+  .restore-transcript-button.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .yt-transcript-content {
+    position: relative;
   }
 `;
 document.head.appendChild(style);
@@ -252,7 +383,9 @@ function markdownToHtml(markdown) {
         .replace(/- (.*$)/gm, '<li>$1</li>')
         .replace(/<li>(.*)<\/li>/gm, '<ul><li>$1</li></ul>')
         .replace(/<\/ul><ul>/g, '')
-        .replace(/\n/g, '<br>');
+        .replace(/\n\s*\n/g, '\n')
+        .replace(/\n/g, '<br>')
+        .replace(/<br>\s*<br>/g, '<br>');
 }
 
 // Create the floating panel
@@ -277,27 +410,28 @@ panel.innerHTML = `
   </div>
   <div class="yt-transcript-content">
     <div class="transcript-column">
-      <div class="column-header">Transcript</div>
+      <div class="column-header">
+        Transcript
+        <button class="collapse-button">←</button>
+      </div>
       <div class="column-content" id="transcript-text"></div>
     </div>
     <div class="summary-column">
       <div class="column-header">AI Analysis</div>
       <div class="column-content">
-        <div class="summary-sections">
-          <div class="summary-section">
-            <div class="section-header">
-              <div class="section-title">Timeline Breakdown</div>
-              <button class="edit-button" data-section="timeline">Edit</button>
-            </div>
-            <div id="timeline-content"></div>
+        <div class="summary-section">
+          <div class="section-header">
+            <div class="section-title">Timeline Breakdown</div>
+            <button class="edit-button" data-section="timeline">Edit</button>
           </div>
-          <div class="summary-section">
-            <div class="section-header">
-              <div class="section-title">Overall Summary</div>
-              <button class="edit-button" data-section="summary">Edit</button>
-            </div>
-            <div id="summary-content"></div>
+          <div class="section-content" id="timeline-content"></div>
+        </div>
+        <div class="summary-section" style="margin-top: 20px;">
+          <div class="section-header">
+            <div class="section-title">Overall Summary</div>
+            <button class="edit-button" data-section="summary">Edit</button>
           </div>
+          <div class="section-content" id="summary-content"></div>
         </div>
       </div>
     </div>
@@ -372,41 +506,120 @@ copyButton.addEventListener('click', async () => {
     }
 });
 
-// Add the editing functionality
-function createEditableArea(content, section) {
-    return `
-        <textarea class="edit-area">${content}</textarea>
-        <div class="edit-actions">
-            <button class="cancel-button">Cancel</button>
-            <button class="save-button">Save</button>
-        </div>
-    `;
+// Function to create markdown toolbar
+function createMarkdownToolbar(textarea) {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'markdown-toolbar';
+
+    const tools = [
+        { icon: '# ', label: 'H1', action: () => wrapText(textarea, '# ', '') },
+        { icon: '## ', label: 'H2', action: () => wrapText(textarea, '## ', '') },
+        { icon: '### ', label: 'H3', action: () => wrapText(textarea, '### ', '') },
+        { icon: 'B', label: 'Bold', action: () => wrapText(textarea, '**', '**') },
+        { icon: 'I', label: 'Italic', action: () => wrapText(textarea, '*', '*') },
+        { icon: '> ', label: 'Quote', action: () => wrapText(textarea, '> ', '') },
+        { icon: '- ', label: 'List', action: () => wrapText(textarea, '- ', '') },
+        { icon: '1. ', label: 'Numbered', action: () => wrapText(textarea, '1. ', '') },
+        { icon: '`', label: 'Code', action: () => wrapText(textarea, '`', '`') },
+        { icon: '---', label: 'Line', action: () => insertText(textarea, '\\n---\\n') }
+    ];
+
+    tools.forEach(tool => {
+        const button = document.createElement('button');
+        button.className = 'toolbar-button';
+        button.innerHTML = `<i>${tool.icon}</i>${tool.label}`;
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            tool.action();
+            textarea.focus();
+        });
+        toolbar.appendChild(button);
+    });
+
+    return toolbar;
 }
 
+// Helper functions for markdown editing
+function wrapText(textarea, before, after) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selection = textarea.value.substring(start, end);
+    const replacement = before + selection + after;
+
+    textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+    textarea.selectionStart = start + before.length;
+    textarea.selectionEnd = end + before.length;
+}
+
+function insertText(textarea, text) {
+    const start = textarea.selectionStart;
+    textarea.value = textarea.value.substring(0, start) + text + textarea.value.substring(start);
+    textarea.selectionStart = textarea.selectionEnd = start + text.length;
+}
+
+// Update the createEditableArea function
+function createEditableArea(content, section) {
+    const editorContainer = document.createElement('div');
+    editorContainer.className = 'markdown-editor';
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'edit-area';
+    textarea.value = content.replace(/<br>/g, '\n').replace(/<[^>]*>/g, '');
+
+    const toolbar = createMarkdownToolbar(textarea);
+
+    const actions = document.createElement('div');
+    actions.className = 'edit-actions';
+    actions.innerHTML = `
+        <button class="edit-button cancel-button">Cancel</button>
+        <button class="edit-button save-button">Save</button>
+    `;
+
+    editorContainer.appendChild(toolbar);
+    editorContainer.appendChild(textarea);
+    editorContainer.appendChild(actions);
+
+    return editorContainer;
+}
+
+// Update the setupEditButton function
 function setupEditButton(section) {
-    const editButton = panel.querySelector(`[data-section="${section}"]`);
-    const contentDiv = panel.querySelector(`#${section}-content`);
+    const editButton = document.querySelector(`[data-section="${section}"]`);
+    const contentDiv = document.querySelector(`#${section}-content`);
+
+    if (!editButton || !contentDiv) {
+        console.error(`Could not find elements for section: ${section}`);
+        return;
+    }
 
     editButton.addEventListener('click', () => {
         const currentContent = contentDiv.innerHTML;
         const originalContent = contentDiv.innerHTML;
 
-        contentDiv.innerHTML = createEditableArea(currentContent.replace(/<br>/g, '\n'), section);
+        // Create editable area
+        const editorContainer = createEditableArea(currentContent, section);
+        contentDiv.innerHTML = '';
+        contentDiv.appendChild(editorContainer);
 
         const textarea = contentDiv.querySelector('textarea');
         const saveButton = contentDiv.querySelector('.save-button');
         const cancelButton = contentDiv.querySelector('.cancel-button');
 
-        saveButton.addEventListener('click', () => {
-            contentDiv.innerHTML = markdownToHtml(textarea.value);
-        });
+        if (textarea && saveButton && cancelButton) {
+            saveButton.addEventListener('click', () => {
+                const newContent = markdownToHtml(textarea.value);
+                contentDiv.innerHTML = newContent;
+            });
 
-        cancelButton.addEventListener('click', () => {
-            contentDiv.innerHTML = originalContent;
-        });
+            cancelButton.addEventListener('click', () => {
+                contentDiv.innerHTML = originalContent;
+            });
+        }
     });
 }
 
+// Call setupEditButton after the panel is added to the document
+document.body.appendChild(panel);
 setupEditButton('timeline');
 setupEditButton('summary');
 
@@ -490,5 +703,72 @@ Here's the transcript: ${transcript}`;
         alert('Error generating analysis: ' + error.message);
         summarizeButton.textContent = 'Analyze';
         summarizeButton.disabled = false;
+    }
+});
+
+// Update the panel HTML to add collapse button
+const transcriptHeader = panel.querySelector('.transcript-column .column-header');
+transcriptHeader.innerHTML = `
+  Transcript
+  <button class="collapse-button">←</button>
+`;
+
+// Add collapse functionality
+const collapseButton = panel.querySelector('.collapse-button');
+const transcriptColumn = panel.querySelector('.transcript-column');
+const summaryColumn = panel.querySelector('.summary-column');
+
+let isTranscriptCollapsed = false;
+
+collapseButton.addEventListener('click', () => {
+    isTranscriptCollapsed = !isTranscriptCollapsed;
+
+    if (isTranscriptCollapsed) {
+        transcriptColumn.style.width = '0';
+        transcriptColumn.style.margin = '0';
+        transcriptColumn.style.padding = '0';
+        transcriptColumn.style.opacity = '0';
+        transcriptColumn.style.flex = '0';
+        summaryColumn.style.flex = '2';
+        restoreButton.style.display = 'block';
+        setTimeout(() => {
+            restoreButton.classList.add('visible');
+        }, 50);
+    } else {
+        transcriptColumn.style.width = '';
+        transcriptColumn.style.margin = '';
+        transcriptColumn.style.padding = '';
+        transcriptColumn.style.opacity = '1';
+        transcriptColumn.style.flex = '1';
+        summaryColumn.style.flex = '1';
+        restoreButton.classList.remove('visible');
+        setTimeout(() => {
+            restoreButton.style.display = 'none';
+        }, 300);
+    }
+
+    transcriptColumn.classList.toggle('collapsed', isTranscriptCollapsed);
+    summaryColumn.classList.toggle('expanded', isTranscriptCollapsed);
+    collapseButton.textContent = isTranscriptCollapsed ? '→' : '←';
+});
+
+// Add restore button functionality
+restoreButton.addEventListener('click', () => {
+    if (isTranscriptCollapsed) {
+        isTranscriptCollapsed = false;
+        transcriptColumn.style.width = '';
+        transcriptColumn.style.margin = '';
+        transcriptColumn.style.padding = '';
+        transcriptColumn.style.opacity = '1';
+        transcriptColumn.style.flex = '1';
+        summaryColumn.style.flex = '1';
+        restoreButton.classList.remove('visible');
+        setTimeout(() => {
+            restoreButton.style.display = 'none';
+        }, 300);
+
+        transcriptColumn.classList.remove('collapsed');
+        summaryColumn.classList.remove('expanded');
+        collapseButton.textContent = '←';
     }
 }); 
