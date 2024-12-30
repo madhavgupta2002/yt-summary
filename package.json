@@ -1,0 +1,26 @@
+{
+    "name": "yt-transcript-copier",
+    "version": "1.0.0",
+    "description": "Chrome extension to copy YouTube video transcripts",
+    "scripts": {
+        "build": "webpack --config webpack.config.js",
+        "watch": "webpack --config webpack.config.js --watch"
+    },
+    "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "groq-sdk": "^0.3.0"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.22.5",
+        "@babel/preset-react": "^7.22.5",
+        "@babel/preset-env": "^7.22.5",
+        "babel-loader": "^9.1.2",
+        "copy-webpack-plugin": "^11.0.0",
+        "webpack": "^5.88.0",
+        "webpack-cli": "^5.1.4",
+        "css-loader": "^6.8.1",
+        "style-loader": "^3.3.3",
+        "dotenv-webpack": "^8.0.1"
+    }
+}
