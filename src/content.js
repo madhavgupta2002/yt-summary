@@ -86,22 +86,6 @@ style.textContent = `
     background-color: #161616;
     border-radius: 12px;
     border: 1px solid rgba(255,255,255,0.1);
-    transition: all 0.3s ease;
-    overflow: hidden;
-  }
-
-  .transcript-column.collapsed {
-    flex: 0;
-    width: 0;
-    padding: 0;
-    margin: 0;
-    opacity: 0;
-    pointer-events: none;
-    overflow: hidden;
-  }
-
-  .summary-column.expanded {
-    flex: 2;
   }
 
   .column-header {
@@ -328,37 +312,6 @@ style.textContent = `
     padding-left: 12px;
     color: #aaa;
   }
-
-  .restore-transcript-button {
-    position: absolute;
-    left: -32px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: #161616;
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
-    color: #aaa;
-    cursor: pointer;
-    padding: 8px;
-    font-size: 16px;
-    opacity: 0;
-    pointer-events: none;
-    transition: all 0.3s ease;
-  }
-
-  .restore-transcript-button:hover {
-    background-color: #202020;
-    color: #fff;
-  }
-
-  .restore-transcript-button.visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .yt-transcript-content {
-    position: relative;
-  }
 `;
 document.head.appendChild(style);
 
@@ -383,9 +336,9 @@ function markdownToHtml(markdown) {
         .replace(/- (.*$)/gm, '<li>$1</li>')
         .replace(/<li>(.*)<\/li>/gm, '<ul><li>$1</li></ul>')
         .replace(/<\/ul><ul>/g, '')
-        .replace(/\n\s*\n/g, '\n')
-        .replace(/\n/g, '<br>')
-        .replace(/<br>\s*<br>/g, '<br>');
+        .replace(/\n{2,}/g, '<br>')
+        .replace(/\n/g, ' ')
+        .trim();
 }
 
 // Create the floating panel
@@ -410,10 +363,7 @@ panel.innerHTML = `
   </div>
   <div class="yt-transcript-content">
     <div class="transcript-column">
-      <div class="column-header">
-        Transcript
-        <button class="collapse-button">←</button>
-      </div>
+      <div class="column-header">Transcript</div>
       <div class="column-content" id="transcript-text"></div>
     </div>
     <div class="summary-column">
@@ -646,13 +596,15 @@ summarizeButton.addEventListener('click', async () => {
         });
 
         // Timeline breakdown request
-        const timelinePrompt = `Analyze this video transcript and provide a detailed timeline breakdown. Format your response exactly like this:
+        const timelinePrompt = `Analyze this video transcript and provide a concise breakdown of the content in chronological order. Format your response as a clean list without timestamps or time markers:
 # Timeline Breakdown
 
-- [00:00] Introduction of topic
-- [MM:SS] Brief description of what happens at this timestamp
-- [MM:SS] Another key moment
-(continue for all major moments)
+- [First topic or segment discussed]
+- [Second topic or segment discussed]
+- [Third topic or segment discussed]
+(continue for all major segments)
+
+Keep each point brief and focused on the content. Avoid any references to time or duration.
 
 Here's the transcript: ${transcript}`;
 
@@ -679,11 +631,11 @@ Here's the transcript: ${transcript}`;
         const [timelineResponse, summaryResponse] = await Promise.all([
             groq.chat.completions.create({
                 messages: [{ role: "user", content: timelinePrompt }],
-                model: "llama3-8b-8192",
+                model: "llama-3.3-70b-versatile",
             }),
             groq.chat.completions.create({
                 messages: [{ role: "user", content: summaryPrompt }],
-                model: "llama3-8b-8192",
+                model: "llama-3.3-70b-versatile",
             })
         ]);
 
@@ -706,69 +658,18 @@ Here's the transcript: ${transcript}`;
     }
 });
 
-// Update the panel HTML to add collapse button
+// Update the panel HTML to remove collapse button
 const transcriptHeader = panel.querySelector('.transcript-column .column-header');
-transcriptHeader.innerHTML = `
-  Transcript
-  <button class="collapse-button">←</button>
-`;
+transcriptHeader.innerHTML = 'Transcript';
 
-// Add collapse functionality
-const collapseButton = panel.querySelector('.collapse-button');
-const transcriptColumn = panel.querySelector('.transcript-column');
-const summaryColumn = panel.querySelector('.summary-column');
+// Remove the restore button and its functionality
+const existingRestoreButton = panel.querySelector('.restore-transcript-button');
+if (existingRestoreButton) {
+    existingRestoreButton.remove();
+}
 
-let isTranscriptCollapsed = false;
-
-collapseButton.addEventListener('click', () => {
-    isTranscriptCollapsed = !isTranscriptCollapsed;
-
-    if (isTranscriptCollapsed) {
-        transcriptColumn.style.width = '0';
-        transcriptColumn.style.margin = '0';
-        transcriptColumn.style.padding = '0';
-        transcriptColumn.style.opacity = '0';
-        transcriptColumn.style.flex = '0';
-        summaryColumn.style.flex = '2';
-        restoreButton.style.display = 'block';
-        setTimeout(() => {
-            restoreButton.classList.add('visible');
-        }, 50);
-    } else {
-        transcriptColumn.style.width = '';
-        transcriptColumn.style.margin = '';
-        transcriptColumn.style.padding = '';
-        transcriptColumn.style.opacity = '1';
-        transcriptColumn.style.flex = '1';
-        summaryColumn.style.flex = '1';
-        restoreButton.classList.remove('visible');
-        setTimeout(() => {
-            restoreButton.style.display = 'none';
-        }, 300);
-    }
-
-    transcriptColumn.classList.toggle('collapsed', isTranscriptCollapsed);
-    summaryColumn.classList.toggle('expanded', isTranscriptCollapsed);
-    collapseButton.textContent = isTranscriptCollapsed ? '→' : '←';
-});
-
-// Add restore button functionality
-restoreButton.addEventListener('click', () => {
-    if (isTranscriptCollapsed) {
-        isTranscriptCollapsed = false;
-        transcriptColumn.style.width = '';
-        transcriptColumn.style.margin = '';
-        transcriptColumn.style.padding = '';
-        transcriptColumn.style.opacity = '1';
-        transcriptColumn.style.flex = '1';
-        summaryColumn.style.flex = '1';
-        restoreButton.classList.remove('visible');
-        setTimeout(() => {
-            restoreButton.style.display = 'none';
-        }, 300);
-
-        transcriptColumn.classList.remove('collapsed');
-        summaryColumn.classList.remove('expanded');
-        collapseButton.textContent = '←';
-    }
-}); 
+// Remove collapse button and its functionality
+const existingCollapseButton = panel.querySelector('.collapse-button');
+if (existingCollapseButton) {
+    existingCollapseButton.remove();
+} 
